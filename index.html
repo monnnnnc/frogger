@@ -1,0 +1,122 @@
+<html>
+  <head>
+    <style>
+      .road {
+        fill: black;
+      }
+      .fly {
+        fill: blue;
+      }
+      .frog {
+        fill: green;
+      }
+      .goldenfrog {
+        fill: orange;
+      }
+      .river {
+        fill: lightblue;
+      }
+      .hidden {
+        visibility: hidden;
+      }
+      .car {
+        fill: red;
+      }
+      .plank {
+        fill: orange;
+      }
+      .goal {
+        fill: lightblue;
+      }
+      .gameover {
+        font-family: sans-serif;
+        font-size: 80px;
+        fill: red;
+      }
+      .instruction {
+        font-family: sans-serif;
+        font-size: 40px;
+        fill: red;
+      }
+    </style>
+  </head>
+  <body>
+    <br />
+    HighScore:
+    <input id="highscore" value="0" disabled />
+    <br />
+    Current Points:
+    <input id="points" value="0" disabled />
+
+    <script src="/bundle.js"></script>
+    <svg
+      id="svgCanvas"
+      width="600"
+      height="600"
+      style="background-color: lightgreen"
+    >
+      <g id="road" transform="translate(0,375)">
+        <polygon class="road" points="0, 0 0, 150 600, 150 600, 0"></polygon>
+      </g>
+
+      <g id="river" transform="translate(0,375)">
+        <polygon class="river" points="0, 0 0, 200 600, 200 600, 0"></polygon>
+      </g>
+
+      <g id="goal" transform="translate(100,50)">
+        <polygon
+          class="goal"
+          points="-25, -25 -25, 25 25, 25 25, -25"
+        ></polygon>
+        <polygon
+          class="goldenfrog hidden"
+          points="-12,12 12,12 0,-12"
+        ></polygon>
+      </g>
+      <g id="goal" transform="translate(200,50)">
+        <polygon
+          class="goal"
+          points="-25, -25 -25, 25 25, 25 25, -25"
+        ></polygon>
+        <polygon
+          class="goldenfrog hidden"
+          points="-12,12 12,12 0,-12"
+        ></polygon>
+      </g>
+      <g id="goal" transform="translate(300,50)">
+        <polygon
+          class="goal"
+          points="-25, -25 -25, 25 25, 25 25, -25"
+        ></polygon>
+        <polygon
+          class="goldenfrog hidden"
+          points="-12,12 12,12 0,-12"
+        ></polygon>
+      </g>
+      <g id="goal" transform="translate(400,50)">
+        <polygon
+          class="goal"
+          points="-25, -25 -25, 25 25, 25 25, -25"
+        ></polygon>
+        <polygon
+          class="goldenfrog hidden"
+          points="-12,12 12,12 0,-12"
+        ></polygon>
+      </g>
+      <g id="goal" transform="translate(500,50)">
+        <polygon
+          class="goal"
+          points="-25, -25 -25, 25 25, 25 25, -25"
+        ></polygon>
+        <polygon
+          class="goldenfrog hidden"
+          points="-12,12 12,12 0,-12"
+        ></polygon>
+      </g>
+
+      <g id="frog" transform="translate(100,100)">
+        <polygon class="frog" points="-12,12 12,12 0,-12"></polygon>
+      </g>
+    </svg>
+  </body>
+</html>
