@@ -123,16 +123,16 @@ function frogger() {
     };
   }
 
-  function createGoal(i: number, f: boolean): Body {
+  function createGoal(i: number): Body {
     return {
-      id: String(i),
+      id: 'goal' + i,
       viewType: 'goal',
-      pos: new Vec(100 * i, 50),
+      pos: new Vec(100 * (i + 1), 50),
       vel: Vec.Zero,
       acc: Vec.Zero,
       radius: 20,
       createTime: 0,
-      ridden: f,
+      ridden: false,
     };
   }
 
@@ -178,9 +178,7 @@ function frogger() {
           : speedDirections(0.5, 'right')
       )
     ),
-    startGoal = [...Array(Constants.NumberGoal)].map((_, i) =>
-      createGoal(i, false)
-    ),
+    startGoal = [...Array(Constants.NumberGoal)].map((_, i) => createGoal(i)),
     initialState: State = {
       time: 0,
       frog: createFrog(),
@@ -230,17 +228,14 @@ function frogger() {
         frog: !scorePoint
           ? {
               ...s.frog,
-              vel: frogRides ? new Vec(riddenPlank[0].vel.x) : Vec.Zero,
+              vel: frogRides ? new Vec(-1 * riddenPlank[0].vel.x) : Vec.Zero,
             }
           : {
               ...s.frog,
               pos: new Vec(Constants.CanvasSize / 2, Constants.CanvasSize - 50),
             },
-        goals: [...Array(Constants.NumberGoal)].map((_, i) => createGoal(i)),
-        points:
-          scorePoint && !goalsCollide[0].ridden
-            ? s.points + Constants.ScorePoints
-            : s.points,
+        exit: s.exit.concat(goalsCollide),
+        points: scorePoint ? s.points + Constants.ScorePoints : s.points,
       };
     },
     // interval tick: bodies move, bullets expire
@@ -254,7 +249,7 @@ function frogger() {
       });
     },
     // state transducer
-    reduceState = (s: State, e: Tick | Move) =>
+    reduceState = (s: State, e: Tick | Move | Restart) =>
       e instanceof Move
         ? {
             ...s,
@@ -339,6 +334,7 @@ function frogger() {
     });
     s.cars.forEach(updateBodyView);
     s.planks.forEach(updateBodyView);
+    s.goals.forEach(updateBodyView);
     s.exit
       .map((o) => document.getElementById(o.id))
       .filter(isNotNullOrUndefined)
