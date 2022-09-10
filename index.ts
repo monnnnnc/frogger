@@ -7,7 +7,7 @@ Observables allow us to capture asynchronous actions like user interface events 
 As an example we will build a little "Asteroids" game using Observables.  We're going to use [rxjs](https://rxjs-dev.firebaseapp.com/) as our Observable implementation, and we are going to render it in HTML using SVG.
 We're also going to take some pains to make pure functional code (and lots of beautiful curried lambda (arrow) functions). We'll use [typescript type annotations](https://www.typescriptlang.org/) to help us ensure that our data is indeed immutable and to guide us in plugging everything together without type errors.
  */
-import { fromEvent, interval, merge } from 'rxjs';
+import { fromEvent, interval, merge, takeWhile } from 'rxjs';
 import { map, filter, scan } from 'rxjs/operators';
 
 type Event = 'keydown';
@@ -348,21 +348,29 @@ function frogger() {
           console.log('Already removed: ' + v.id);
         }
       });
+
     if (s.gameOver) {
-      subscription.unsubscribe();
-
-      const reset = merge(restart)
-        .pipe(scan(reduceState, initialState))
-        .subscribe(updateView);
-
+    s.planks.map((o) => document.getElementById(o.id))
+    .filter(isNotNullOrUndefined)
+    .forEach((v) => {
+      try {
+        svg.removeChild(v);
+      } catch (e) {
+        // rarely it can happen that a bullet can be in exit
+        // for both expiring and colliding in the same tick,
+        // which will cause this exception
+        console.log('Already removed: ' + v.id);
+      }
+    });
+      
       const v = document.createElementNS(svg.namespaceURI, 'text')!;
       attr(v, {
-        x: Constants.CanvasSize / 6,
-        y: Constants.CanvasSize / 2,
-        class: 'gameover',
-      });
-      v.textContent = 'Game Over';
-      svg.appendChild(v);
+        x: Constants.CanvasSize / 6, 
+        y: Constants.CanvasSize / 2, 
+        class: 'gameover', 
+      }); 
+      v.textContent = 'Game Over'; 
+      svg.appendChild(v); 
     }
   }
 }
