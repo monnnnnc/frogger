@@ -4,7 +4,7 @@
       .road {
         fill: black;
       }
-      .fly {
+      .bird {
         fill: blue;
       }
       .frog {
@@ -25,6 +25,9 @@
       .plank {
         fill: orange;
       }
+      .goose {
+        fill: white;
+      }
       .goal {
         fill: yellow;
       }
@@ -33,10 +36,18 @@
         font-size: 80px;
         fill: red;
       }
+      .restart {
+        font-family: sans-serif;
+        font-size: 40px;
+        fill: white;
+      }
       .instruction {
         font-family: sans-serif;
         font-size: 40px;
         fill: red;
+      }
+      .block {
+        fill: black;
       }
     </style>
   </head>
@@ -62,61 +73,67 @@
       <g id="river" transform="translate(0,375)">
         <polygon class="river" points="0, 0 0, 200 600, 200 600, 0"></polygon>
       </g>
-      <!-- 
-      <g id="goal" transform="translate(100,50)">
-        <polygon
-          class="goal"
-          points="-25, -25 -25, 25 25, 25 25, -25"
-        ></polygon>
-        <polygon
-          class="goldenfrog hidden"
-          points="-12,12 12,12 0,-12"
-        ></polygon>
-      </g>
-      <g id="goal" transform="translate(200,50)">
-        <polygon
-          class="goal"
-          points="-25, -25 -25, 25 25, 25 25, -25"
-        ></polygon>
-        <polygon
-          class="goldenfrog hidden"
-          points="-12,12 12,12 0,-12"
-        ></polygon>
-      </g>
-      <g id="goal" transform="translate(300,50)">
-        <polygon
-          class="goal"
-          points="-25, -25 -25, 25 25, 25 25, -25"
-        ></polygon>
-        <polygon
-          class="goldenfrog hidden"
-          points="-12,12 12,12 0,-12"
-        ></polygon>
-      </g>
-      <g id="goal" transform="translate(400,50)">
-        <polygon
-          class="goal"
-          points="-25, -25 -25, 25 25, 25 25, -25"
-        ></polygon>
-        <polygon
-          class="goldenfrog hidden"
-          points="-12,12 12,12 0,-12"
-        ></polygon>
-      </g>
-      <g id="goal" transform="translate(500,50)">
-        <polygon
-          class="goal"
-          points="-25, -25 -25, 25 25, 25 25, -25"
-        ></polygon>
-        <polygon
-          class="goldenfrog hidden"
-          points="-12,12 12,12 0,-12"
-        ></polygon>
-      </g> -->
 
       <g id="frog" transform="translate(100,100)">
         <polygon class="frog" points="-12,12 12,12 0,-12"></polygon>
       </g>
+
+      <g id="gameover" transform="translate(100,590)">
+        <text class="gameover">Game Over</text>
+      </g>
+
+      <g id="restart" transform="translate(100,365)">
+        <text class="restart">Press Enter to Restart</text>
+      </g>
     </svg>
+
+    <b>Main Objectives:</b> Cross the road and collect all the coins without
+    dying.
+    <p>Frog (Main Character, green) - Use the arrow keys to move the frogs.</p>
+    <p>
+      <b>Instances (Circles):</b>
+    </p>
+
+    <ul>
+      <li>
+        Car (Dangerous, red) - Avoid touching the car when crossing the road.
+      </li>
+      <li>
+        Plank (Safe, orange) - Jump to the plank platform to cross the river
+        safely.
+      </li>
+      <li>
+        Goose (Safe, white) - Use the Goose to cross the river, but be careful,
+        they will send you backward.
+      </li>
+      <li>
+        Bird (Dangerous, blue) - After collecting all of the coins, the birds
+        will come from different directions to attack you.
+      </li>
+      <li>Coins (Goal, yellow) - Collect them all to get the Final level.</li>
+      <li>
+        Final Dark Coin (Bonus Points, black) - Touch this dark coin to earn
+        more points.
+      </li>
+    </ul>
+
+    <br />
+    <b>Ground (Rectangle):</b>
+    <ul>
+      <li>Grass (Safe) - green</li>
+      <li>Road (Safe) - black</li>
+      <li>River (Dangerous) - lightblue</li>
+    </ul>
+
+    <br />
+    <b>Keys: </b>
+    <ul>
+      <li>Press Arrow to move to the Up</li>
+      <li>Press Arrow to move to the Down</li>
+      <li>Press Left Arrow to move to the Left</li>
+      <li>Press Right Arrow to move to the Right</li>
+      <li>Press Spacebar to Jump</li>
+      <li>Press Enter to Restart</li>
+    </ul>
   </body>
 </html>
