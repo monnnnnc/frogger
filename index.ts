@@ -1,32 +1,49 @@
 /**
 # Introduction
-[See full documentation](https://tgdwyer.github.io/asteroids/)
 
-Observables allow us to capture asynchronous actions like user interface events in streams.  These allow us to "linearise" the flow of control, avoid deeply nested loops, and process the stream with pure, referentially transparent functions.
+We may record asynchronous events, such as user interface events, in streams using observables. These enable us to handle the stream using just pure, referentially transparent functions, eliminate deeply nested loops, and "linearize" the control flow.
 
-As an example we will build a little "Asteroids" game using Observables.  We're going to use [rxjs](https://rxjs-dev.firebaseapp.com/) as our Observable implementation, and we are going to render it in HTML using SVG.
-We're also going to take some pains to make pure functional code (and lots of beautiful curried lambda (arrow) functions). We'll use [typescript type annotations](https://www.typescriptlang.org/) to help us ensure that our data is indeed immutable and to guide us in plugging everything together without type errors.
+We'll create a simple "Asteroids" game as an illustration utilizing Observables. Our Observable implementation will be [rxjs](https://rxjs-dev.firebaseapp.com), and we'll use SVG to represent it in HTML.
+
+Additionally, we will build pure functional code with tons of gorgeous curried lambda (arrow) functions. We'll make sure that our data is immutable using [typescript type annotations](https://www.typescriptlang.org/), and we'll utilize them to assist us plug everything together without making any type mistakes.
+
+[Reference](https://tgdwyer.github.io/asteroids/)
+[Documentation](https://github.com/monnnnnc/frogger/)
  */
 import { fromEvent, interval, merge, takeWhile } from 'rxjs';
 import { map, filter, scan } from 'rxjs/operators';
 
 type Event = 'keydown';
+type Key =
+  | 'ArrowUp'
+  | 'ArrowDown'
+  | 'ArrowRight'
+  | 'ArrowLeft'
+  | 'Enter'
+  | 'Space';
 
 function frogger() {
   const Constants = {
     CanvasSize: 600,
-    StartCarsRadius: 20,
-    StartCarsCount: 3,
+    StartInstanceRadius: 20,
+    StartInstanceCount: 3,
     StartRows: 3,
-    StartPlankCount: 3,
-    StartPlankRadius: 20,
     StartTime: 0,
     ScorePoints: 500,
     NumberGoal: 5,
+    FinalScorePoints: 1000,
   } as const;
 
   // our game has the following view element types:
-  type ViewType = 'car' | 'frog' | 'plank' | 'river' | 'goal';
+  type ViewType =
+    | 'car'
+    | 'frog'
+    | 'plank'
+    | 'river'
+    | 'goal'
+    | 'finalgoal'
+    | 'goose'
+    | 'bird';
 
   // Four types of game state transitions
   class Tick {
@@ -36,6 +53,9 @@ function frogger() {
     constructor(public readonly direction: string) {}
   }
   class Restart {
+    constructor() {}
+  }
+  class Jump {
     constructor() {}
   }
 
@@ -49,6 +69,7 @@ function frogger() {
     moveRight = keyObservable('keydown', 'ArrowRight', () => new Move('right')),
     moveLeft = keyObservable('keydown', 'ArrowLeft', () => new Move('left')),
     moveDown = keyObservable('keydown', 'ArrowDown', () => new Move('down')),
+    jump = keyObservable('keydown', 'Space', () => new Jump()),
     restart = keyObservable('keydown', 'Enter', () => new Restart());
 
   type Circle = Readonly<{ pos: Vec; radius: number }>;
@@ -58,11 +79,9 @@ function frogger() {
     viewType: ViewType;
     vel: Vec;
     acc: Vec;
-    ridden: boolean;
   }
   interface IGround extends ObjectId, Rectangle {
     viewType: ViewType;
-    ridden: boolean;
   }
 
   // Every object that participates in physics is a Body
@@ -76,7 +95,10 @@ function frogger() {
     cars: ReadonlyArray<Body>;
     planks: ReadonlyArray<Body>;
     river: Ground;
+    geese: ReadonlyArray<Body>;
+    birds: ReadonlyArray<Body>;
     goals: ReadonlyArray<Body>;
+    finalgoal: ReadonlyArray<Body>;
     exit: ReadonlyArray<Body>;
     objCount: number;
     gameOver: boolean;
@@ -84,7 +106,7 @@ function frogger() {
     highscore: number;
   }>;
 
-  // Cars and bullets are both just circles
+  // All instances, excepts frog, are just circles (dividen by colours)
   const createCircle =
       (viewType: ViewType) => (oid: ObjectId) => (circ: Circle) => (vel: Vec) =>
         <Body>{
@@ -96,18 +118,19 @@ function frogger() {
           viewType: viewType,
         },
     createCar = createCircle('car'),
-    createPlank = createCircle('plank');
+    createPlank = createCircle('plank'),
+    createGoose = createCircle('goose'),
+    createBird = createCircle('bird');
 
   function createFrog(): Body {
     return {
       id: 'frog',
       viewType: 'frog',
-      pos: new Vec(Constants.CanvasSize / 2, Constants.CanvasSize - 500),
+      pos: new Vec(Constants.CanvasSize / 2, Constants.CanvasSize - 50),
       vel: Vec.Zero,
       acc: Vec.Zero,
       radius: 20,
       createTime: 0,
-      ridden: false,
     };
   }
 
@@ -119,7 +142,6 @@ function frogger() {
       width: Constants.CanvasSize,
       height: Constants.CanvasSize / 4,
       createTime: 0,
-      ridden: false,
     };
   }
 
@@ -132,35 +154,45 @@ function frogger() {
       acc: Vec.Zero,
       radius: 20,
       createTime: 0,
-      ridden: false,
     };
   }
 
-  const // note: Math.random() is impure and non-deterministic (by design) it takes its seed from external state.
-    // if we wanted to use randomness inside the Observable streams below, it would be better to create a
-    // pseudo-random number sequence Observable that we have complete control over.
-    speedDirections = (v: number, d: string) =>
+  function createFinalGoal(i: number): Body {
+    return {
+      id: 'finalgoal' + i,
+      viewType: 'finalgoal',
+      pos: new Vec(300 * (i + 1), 50),
+      vel: Vec.Zero,
+      acc: Vec.Zero,
+      radius: 20,
+      createTime: 0,
+    };
+  }
+
+  // Observable streams for each and every movements and how each instances works
+  const speedDirections = (v: number, d: string) =>
       new Vec(d == 'left' ? -1 * v : v), // change speed and direction
-    startCars = [...Array(Constants.StartCarsCount * Constants.StartRows)].map(
-      (_, i) =>
-        createCar({ id: String(i), createTime: i })({
-          pos:
-            i < Constants.StartRows * 1
-              ? new Vec(1000 * (i + 1), Constants.CanvasSize - 100)
-              : i < Constants.StartRows * 2
-              ? new Vec(1000 * (i + 1), Constants.CanvasSize - 150)
-              : new Vec(1000 * (i + 1), Constants.CanvasSize - 200), // change position
-          radius: Constants.StartCarsRadius,
-        })(
+    startCars = [
+      ...Array(Constants.StartInstanceCount * Constants.StartRows),
+    ].map((_, i) =>
+      createCar({ id: String(i), createTime: i })({
+        pos:
           i < Constants.StartRows * 1
-            ? speedDirections(0, 'right')
+            ? new Vec(1000 * (i + 1), Constants.CanvasSize - 100)
             : i < Constants.StartRows * 2
-            ? speedDirections(0, 'left')
-            : speedDirections(0, 'left')
-        )
+            ? new Vec(1000 * (i + 1), Constants.CanvasSize - 150)
+            : new Vec(1000 * (i + 1), Constants.CanvasSize - 200), // change position
+        radius: Constants.StartInstanceRadius,
+      })(
+        i < Constants.StartRows * 1
+          ? speedDirections(0.5, 'right')
+          : i < Constants.StartRows * 2
+          ? speedDirections(1, 'left')
+          : speedDirections(0.2, 'left')
+      )
     ),
     startPlanks = [
-      ...Array(Constants.StartPlankCount * Constants.StartRows),
+      ...Array(Constants.StartInstanceCount * Constants.StartRows),
     ].map((_, i) =>
       createPlank({ id: String(i), createTime: i })({
         pos:
@@ -169,25 +201,46 @@ function frogger() {
             : i < Constants.StartRows * 2
             ? new Vec(1000 * (i + 1), 250)
             : new Vec(1000 * (i + 1), 300), // change position
-        radius: Constants.StartCarsRadius,
+        radius: Constants.StartInstanceRadius,
       })(
         i < Constants.StartRows * 1
-          ? speedDirections(1, 'left')
+          ? speedDirections(0.5, 'left')
           : i < Constants.StartRows * 2
-          ? speedDirections(2, 'left')
-          : speedDirections(0.5, 'right')
+          ? speedDirections(1, 'left')
+          : speedDirections(0.3, 'right')
       )
     ),
+    startGeese = [
+      ...Array(Constants.StartInstanceCount * Constants.StartRows),
+    ].map((_, i) =>
+      createGoose({ id: String(i), createTime: i })({
+        pos: new Vec(1000 * (i + 1), 150), // change position
+        radius: Constants.StartInstanceRadius,
+      })(speedDirections(0.2, 'right'))
+    ),
+    initialBirdsDirections = [...Array(Constants.StartInstanceCount)].map(
+      (_, i) => new Vec(0.5 - i, 0.5 - i * 2)
+    ),
+    startBirds = [...Array(Constants.StartInstanceCount)].map((_, i) =>
+      createBird({ id: String(i), createTime: Constants.StartTime })({
+        pos: Vec.Zero,
+        radius: Constants.StartInstanceRadius,
+      })(initialBirdsDirections[i])
+    ),
     startGoal = [...Array(Constants.NumberGoal)].map((_, i) => createGoal(i)),
+    startFinalGoal = [...Array(1)].map((_, i) => createFinalGoal(i)),
     initialState: State = {
       time: 0,
       frog: createFrog(),
       cars: startCars,
       planks: startPlanks,
+      geese: startGeese,
+      birds: startBirds,
       river: createRiver(),
       goals: startGoal,
+      finalgoal: [],
       exit: [],
-      objCount: Constants.StartCarsCount,
+      objCount: Constants.StartInstanceCount,
       gameOver: false,
       points: 0,
       highscore: 0,
@@ -206,51 +259,76 @@ function frogger() {
         vel: o.vel.add(o.acc),
       },
     // check a State for collisions:
-    //   frog colliding with car ends game
+    //   frog colliding with instances with respective effects, including ends game
     handleCollisions = (s: State) => {
       const bodiesCollided = ([a, b]: [Body, Body]) =>
           a.pos.sub(b.pos).len() < a.radius + b.radius,
         bodiesRide = ([a, b]: [Body, Body]) =>
           a.pos.sub(b.pos).len() < a.radius - 7 + b.radius,
         frogCollided =
-          s.cars.filter((r) => bodiesCollided([s.frog, r])).length > 0,
-        frogRides = s.planks.filter((r) => bodiesRide([s.frog, r])).length > 0,
+          s.cars.filter((r) => bodiesCollided([s.frog, r])).length > 0 ||
+          s.birds.filter((r) => bodiesCollided([s.frog, r])).length > 0,
+        frogRides =
+          s.planks.filter((r) => bodiesRide([s.frog, r])).length > 0 ||
+          s.geese.filter((r) => bodiesRide([s.frog, r])).length > 0,
         riddenPlank = s.planks.filter((r) => bodiesCollided([s.frog, r])),
+        riddenGoose = s.geese.filter((r) => bodiesRide([s.frog, r])),
         frogOutside = s.frog.pos.x <= 0 || s.frog.pos.x >= Constants.CanvasSize,
         frogInRiver = s.frog.pos.y < 350 && s.frog.pos.y > 100,
         frogInRiverAndPlank = frogRides ? !frogInRiver : frogInRiver,
         goalsCollide = s.goals.filter((r) => bodiesRide([s.frog, r])),
-        scorePoint = goalsCollide.length > 0;
+        finalGoalsCollide = s.finalgoal.filter((r) => bodiesRide([s.frog, r])),
+        scorePoint = goalsCollide.length > 0,
+        cut = except((a: Body) => (b: Body) => a.id === b.id);
 
       return <State>{
         ...s,
         gameOver: frogCollided || frogOutside || frogInRiverAndPlank,
-        frog: !scorePoint
-          ? {
-              ...s.frog,
-              vel: frogRides ? new Vec(-1 * riddenPlank[0].vel.x) : Vec.Zero,
-            }
-          : {
-              ...s.frog,
-              pos: new Vec(Constants.CanvasSize / 2, Constants.CanvasSize - 50),
-            },
+        frog:
+          !scorePoint && !(finalGoalsCollide.length > 0)
+            ? {
+                ...s.frog,
+                vel:
+                  frogRides && riddenGoose.length > 0
+                    ? new Vec(-1 * riddenGoose[0].vel.x)
+                    : frogRides && riddenPlank.length > 0
+                    ? new Vec(riddenPlank[0].vel.x)
+                    : Vec.Zero,
+              }
+            : {
+                ...s.frog,
+                pos: new Vec(
+                  Constants.CanvasSize / 2,
+                  Constants.CanvasSize - 50
+                ),
+              },
+        goals: cut(s.goals)(goalsCollide),
         exit: s.exit.concat(goalsCollide),
-        points: scorePoint ? s.points + Constants.ScorePoints : s.points,
+        points: scorePoint
+          ? s.points + Constants.ScorePoints
+          : finalGoalsCollide.length > 0
+          ? s.points + Constants.FinalScorePoints
+          : s.points,
       };
     },
-    // interval tick: bodies move, bullets expire
+    // interval tick: bodies move
     tick = (s: State, elapsed: number) => {
-      return handleCollisions({
-        ...s,
-        frog: moveBody(s.frog),
-        cars: s.cars.map(moveBody),
-        planks: s.planks.map(moveBody),
-        time: elapsed,
-      });
+      return s.gameOver
+        ? handleCollisions({ ...s })
+        : handleCollisions({
+            ...s,
+            frog: moveBody(s.frog),
+            cars: s.cars.map(moveBody),
+            planks: s.planks.map(moveBody),
+            geese: s.geese.map(moveBody),
+            birds: s.goals.length <= 0 ? s.birds.map(moveBody) : s.birds,
+            finalgoal: s.goals.length <= 0 ? startFinalGoal : [],
+            time: elapsed,
+          });
     },
     // state transducer
-    reduceState = (s: State, e: Tick | Move | Restart) =>
-      e instanceof Move
+    reduceState = (s: State, e: Tick | Move | Restart | Jump) =>
+      e instanceof Move && !s.gameOver
         ? {
             ...s,
             frog: {
@@ -285,6 +363,18 @@ function frogger() {
         ? {
             ...initialState,
             highscore: s.points > s.highscore ? s.points : s.highscore,
+            exit: s.finalgoal,
+          }
+        : e instanceof Jump
+        ? {
+            ...s,
+            frog: {
+              ...s.frog,
+              pos: new Vec(
+                s.frog.pos.x,
+                s.frog.pos.y <= 100 ? 50 : s.frog.pos.y - 100
+              ),
+            },
           }
         : tick(s, e.elapsed);
 
@@ -295,6 +385,7 @@ function frogger() {
     moveLeft,
     moveRight,
     moveDown,
+    jump,
     restart
   )
     .pipe(scan(reduceState, initialState))
@@ -308,6 +399,11 @@ function frogger() {
       river = document.getElementById('river')!,
       points = document.getElementById('points')!,
       highscore = document.getElementById('highscore')!,
+      show = (id: string, condition: boolean) =>
+        ((e: HTMLElement) =>
+          condition ? e.classList.remove('hidden') : e.classList.add('hidden'))(
+          document.getElementById(id)!
+        ),
       updateBodyView = (b: Body) => {
         function createBodyView() {
           const v = document.createElementNS(svg.namespaceURI, 'ellipse')!;
@@ -319,6 +415,7 @@ function frogger() {
         const v = document.getElementById(b.id) || createBodyView();
         attr(v, { cx: b.pos.x, cy: b.pos.y });
       };
+    show('gameover', s.gameOver == true);
     attr(frog, {
       transform: `translate(${s.frog.pos.x},${s.frog.pos.y})`,
     });
@@ -334,7 +431,10 @@ function frogger() {
     });
     s.cars.forEach(updateBodyView);
     s.planks.forEach(updateBodyView);
+    s.geese.forEach(updateBodyView);
+    s.birds.forEach(updateBodyView);
     s.goals.forEach(updateBodyView);
+    s.finalgoal.forEach(updateBodyView);
     s.exit
       .map((o) => document.getElementById(o.id))
       .filter(isNotNullOrUndefined)
@@ -350,27 +450,6 @@ function frogger() {
       });
 
     if (s.gameOver) {
-    s.planks.map((o) => document.getElementById(o.id))
-    .filter(isNotNullOrUndefined)
-    .forEach((v) => {
-      try {
-        svg.removeChild(v);
-      } catch (e) {
-        // rarely it can happen that a bullet can be in exit
-        // for both expiring and colliding in the same tick,
-        // which will cause this exception
-        console.log('Already removed: ' + v.id);
-      }
-    });
-      
-      const v = document.createElementNS(svg.namespaceURI, 'text')!;
-      attr(v, {
-        x: Constants.CanvasSize / 6, 
-        y: Constants.CanvasSize / 2, 
-        class: 'gameover', 
-      }); 
-      v.textContent = 'Game Over'; 
-      svg.appendChild(v); 
     }
   }
 }
